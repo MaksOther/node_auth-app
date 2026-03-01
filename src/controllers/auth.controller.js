@@ -18,15 +18,16 @@ const validatePassword = (value) => {
 };
 
 const registration = catchError(async (req, res) => {
-  const { email, password } = req.body;
+  const { name, email, password } = req.body;
   const activateToken = uuidv4();
 
   const errors = {
     email: validateEmail(email),
     password: validatePassword(password),
+    name: !name ? "Name is required" : undefined,
   };
 
-  if (errors.email || errors.password) {
+  if (errors.email || errors.password || errors.name) {
     throw ApiError.badRequest("Bad request", errors);
   }
 
@@ -37,12 +38,13 @@ const registration = catchError(async (req, res) => {
 
   const hashedPass = await bcrypt.hash(password, 10);
 
-  const newUser = await User.create({ 
-    email, 
-    password: hashedPass, 
-    activateToken 
+  const newUser = await User.create({
+    name,
+    email,
+    password: hashedPass,
+    activateToken,
   });
-  
+
   await emailService.sendActivationEmail(email, activateToken);
 
   res.send(newUser);
@@ -77,7 +79,11 @@ const login = catchError(async (req, res) => {
   const user = await User.findOne({ where: { email } });
 
   if (!user) {
-    throw ApiError.badRequest("No such user"); 
+    throw ApiError.badRequest("No such user");
+  }
+
+  if (user.activateToken) {
+    throw ApiError.badRequest("Please activate your email first");
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -86,33 +92,54 @@ const login = catchError(async (req, res) => {
     throw ApiError.badRequest("Wrong password");
   }
 
-  const userData = {
-    id: user.id,
-    email: user.email,
-  };
+  const userData = { id: user.id, email: user.email, name: user.name };
 
-  const accessToken = jwtService.sign(userData);
+  const accessToken = jwtService.signAccess(userData);
+  const refreshToken = jwtService.signRefresh(userData);
 
-  res.send({
-    user: userData,
-    accessToken,
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
   });
+
+  res.send({ user: userData, accessToken });
 });
 
-const refresh = (req, res) => {
-    const {refreshToken } = refresh.cookies;
+const refresh = catchError(async (req, res) => {
+  const { refreshToken } = req.cookies;
 
-    const user = jwtService.verifyRefresh(refreshToken);
+  const userData = jwtService.verifyRefresh(refreshToken);
 
-    if (!user) {
-        throw ApiError.unauthorized()
-    }
+  if (!userData) {
+    throw ApiError.unauthorized();
+  }
 
-    
-}
+  const user = await User.findByPk(userData.id);
+  if (!user) {
+    throw ApiError.unauthorized();
+  }
+
+  const newUserData = { id: user.id, email: user.email, name: user.name };
+  const newAccessToken = jwtService.signAccess(newUserData);
+  const newRefreshToken = jwtService.signRefresh(newUserData);
+
+  res.cookie("refreshToken", newRefreshToken, {
+    httpOnly: true,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+
+  res.send({ user: newUserData, accessToken: newAccessToken });
+});
+
+const logout = catchError(async (req, res) => {
+  res.clearCookie("refreshToken");
+  res.sendStatus(204);
+});
 
 export const AuthController = {
   registration,
   activate,
   login,
+  refresh,
+  logout,
 };
