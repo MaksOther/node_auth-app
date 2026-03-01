@@ -1,5 +1,4 @@
 import { Todo } from "../models/Todo.js";
-import { User } from "../models/User.js";
 import { client } from "../utils/db.js";
 
 export const getAll = async (userId) => {
@@ -44,10 +43,6 @@ export const updateMany = async (items, userId) => {
 
   return getAll(userId);
 };
-
-export function findByEmail(email) {
-  return User.findOne({ where: { email } });
-}
 
 export const remove = async (id, userId) => {
   return await Todo.destroy({ where: { id, userId } });

@@ -1,5 +1,6 @@
 import { DataTypes } from "sequelize";
 import { client } from "../utils/db.js";
+import { User } from "./User.js";
 
 export const Todo = client.define(
   "Todo",
@@ -18,6 +19,15 @@ export const Todo = client.define(
       allowNull: false,
       defaultValue: false,
     },
+    // Зв'язок з юзером
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
   },
   {
     tableName: "todos",
@@ -25,3 +35,6 @@ export const Todo = client.define(
     createdAt: false,
   }
 );
+
+User.hasMany(Todo, { foreignKey: "userId" });
+Todo.belongsTo(User, { foreignKey: "userId" });

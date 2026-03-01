@@ -10,4 +10,10 @@ authRouter.get("/activate/:activateToken", catchError(AuthController.activate));
 authRouter.post("/login", catchError(AuthController.login));
 authRouter.post("/refresh", catchError(AuthController.refresh));
 
+authRouter.post("/reset-password", catchError(AuthController.requestPasswordReset));
+authRouter.post("/reset-password/:token", catchError(AuthController.confirmPasswordReset));
+
 authRouter.post("/logout", authMiddlewares, catchError(AuthController.logout));
+authRouter.patch("/profile/name", authMiddlewares, catchError(AuthController.changeName));
+authRouter.patch("/profile/password", authMiddlewares, catchError(AuthController.changePassword));
+authRouter.patch("/profile/email", authMiddlewares, catchError(AuthController.changeEmail));
